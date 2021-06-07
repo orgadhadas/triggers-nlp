@@ -6,6 +6,8 @@ from transformers import AutoTokenizer, AutoModelWithLMHead
 import numpy as np
 import json
 from tqdm import tqdm
+import os
+import torch
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Get sentence statistics (mean log proba, std) for each length.')
@@ -23,29 +25,56 @@ def get_sentence_log_proba(model, tokenizer, s):
     res = model(**input)
     return res.logits[0, range(input['input_ids'].size(1)-1), input['input_ids'][0][1:]].sum().item()
 
-with open("../data/train_data_label_contradiction_uniq.txt") as f:
-    contradiction = f.readlines()
+def get_sentence_loss(model, tokenizer, s):
+    input = tokenizer.encode(s, return_tensors='pt')
+    with torch.no_grad():
+        model.eval()
+        loss = model(input, labels=input).loss
+    return loss.item()
+
+
+
+
+
+# with open("../data/train_data_label_contradiction_uniq.txt") as f:
+#     contradiction = f.readlines()
 
 with open("../data/train_data_label_entailment_uniq.txt") as f:
     entailment = f.readlines()
 
-with open("../data/train_data_label_neutral_uniq.txt") as f:
-    neutral = f.readlines()
+# with open("../data/train_data_label_neutral_uniq.txt") as f:
+#     neutral = f.readlines()
 
-sentences = []
-sentences += contradiction + entailment + neutral
-sentences = sentences[:10000]
+
+
+sentences = entailment
+# sentences = []
+# base_dir = "../data"
+# prefix = "dev_data_label_entailment_uniq.txt."
+# trigger_list = ["spacecraft_goals_pager_drowning_facial", "xbox_masons_cyclone_clusters_netball", "no_scarlet_shred_cloned_wildebeest", 
+# "astronauts_slumbers_investment_sherpa_hourly", "beef_tiered_inning_canoeing_yello"]
+# for trigger in trigger_list:
+#     with open(os.path.join(base_dir, (prefix + trigger))) as f:
+#         sentences += f.readlines()
+
+
+
 
 sentences_new = list(map(lambda x : x[:-10], sentences))
 sentences_new = list(map(lambda x : clean_spaces(x), sentences_new))
-
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 model = AutoModelWithLMHead.from_pretrained("gpt2")
 
 d = defaultdict(list)
+
+# d = defaultdict(list)
+
 for s in tqdm(sentences_new):
-    log_proba = get_sentence_log_proba(model, tokenizer, s)
-    d[len(tokenizer(s)['input_ids'])].append(log_proba)
+    # log_proba = get_sentence_log_proba(model, tokenizer, s)
+    loss = get_sentence_loss(model, tokenizer, s)
+    # d[len(tokenizer(s)['input_ids'])].append(log_proba)
+    d[len(tokenizer(s)['input_ids'])].append(loss)
+
 
 output_dict = {}
 for length in d.keys():
