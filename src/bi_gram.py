@@ -1,10 +1,11 @@
 from collections import defaultdict, Counter
 import argparse
-from utils import get_clean_sentences_from_file, get_tuples_trigger_file_path_num_trigger_list, parse_args
 import json
 import torchtext as tt
 from tqdm import tqdm
 import numpy as np
+
+from src.Utils import get_clean_sentences_from_file, get_tuples_trigger_file_path_num_trigger_list, parse_args
 
 
 def train_bi_gram_model(input_path, output_path):
