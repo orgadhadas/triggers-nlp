@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import numpy as np
 
 def parse_args_old():
     parser = argparse.ArgumentParser(description='Get sentence statistics (mean log proba, std) for each length.')
@@ -31,7 +32,7 @@ def get_sentence_loss(model, tokenizer, s):
     input = tokenizer.encode(s, return_tensors='pt')
     with torch.no_grad():
         model.eval()
-        loss = model(input, labels=input).loss
+        loss = model(input.to(model.device), labels=input.to(model.device)).loss
     return loss.item()
 
 
@@ -55,3 +56,9 @@ def parse_args():
     parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
     args = parser.parse_args()
     return args
+
+def get_array_mean_std(l: list):
+    arr = np.array(l)
+    return arr.mean(), arr.std()
+
+# def get_mean_std_from_rate_list(rate_per_len_dict):

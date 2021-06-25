@@ -5,7 +5,7 @@ import torchtext as tt
 from tqdm import tqdm
 import numpy as np
 
-from Utils import get_clean_sentences_from_file, get_tuples_trigger_file_path_num_trigger_list, parse_args
+from Utils import *
 
 
 def train_bi_gram_model(input_path, output_path):
@@ -98,14 +98,8 @@ def main(triggers_dir_path):
     std_tp_rec_dict = dict()
 
     for trigger_len in acc_per_len_dict.keys():
-        mean_acc_location = np.array(acc_per_len_dict[trigger_len]).mean()
-        mean_location_acc_dict[trigger_len] = mean_acc_location
-        std_acc_location = np.array(acc_per_len_dict[trigger_len]).std()
-        std_location_acc_dict[trigger_len] = std_acc_location
-        mean_tp_rec = np.array(tp_rec_per_len_dict[trigger_len]).mean()
-        mean_tp_rec_dict[trigger_len] = mean_tp_rec
-        std_tp_rec = np.array(tp_rec_per_len_dict[trigger_len]).std()
-        std_tp_rec_dict[trigger_len] = np.array(std_tp_rec)
+        mean_acc_location, std_acc_location = get_array_mean_std(acc_per_len_dict[trigger_len])
+        mean_tp_rec, std_tp_rec = get_array_mean_std(tp_rec_per_len_dict[trigger_len])
         print(f"trigger len: {trigger_len} trigger location mean acc: {mean_acc_location} +- {std_acc_location} "
               f"trigger recognize mean TPR: {mean_tp_rec} +- {std_tp_rec}")
 
