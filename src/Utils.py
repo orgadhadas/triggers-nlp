@@ -47,13 +47,22 @@ def get_tuples_trigger_file_path_num_trigger_list(dir_path):
         trigger = triggered_file_name.split(".")[-1]
         trigger_ends_location = len(trigger.split('_'))
         trigger_file_path = dir_path + '/' + triggered_file_name
-        tuple_list.append((trigger_file_path, trigger_ends_location))
+        tuple_list.append((trigger_file_path, trigger_ends_location, trigger))
     return tuple_list
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Get model result.')
     parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
+    parser.add_argument('--clean', '-c', required=True, type=str, help='The file with orignal sentences (no trigger)')
+    args = parser.parse_args()
+    return args
+
+def parse_args_with_stats():
+    parser = argparse.ArgumentParser(description='Get model result.')
+    parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
+    parser.add_argument('--clean', '-c', required=True, type=str, help='The file with orignal sentences (no trigger)')
+    parser.add_argument('--stats', '-s', required=True, type=str, help='The file of statistics')
     args = parser.parse_args()
     return args
 

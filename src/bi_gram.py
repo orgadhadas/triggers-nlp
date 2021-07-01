@@ -2,10 +2,11 @@ from collections import defaultdict, Counter
 import argparse
 import json
 import torchtext as tt
+import wandb
 from tqdm import tqdm
 import numpy as np
 
-from Utils import *
+from Utils import get_clean_sentences_from_file, get_tuples_trigger_file_path_num_trigger_list, parse_args
 
 
 def train_bi_gram_model(input_path, output_path):
@@ -74,22 +75,32 @@ def test(path, b_dict, gt_trigger_ends_location=0):
     return num_attacked, num_recognized_trigger_location, len(sentences)
 
 
-def main(triggers_dir_path):
+def main(args):
+
+    thr = 0
+    wandb.init(project="triggers-detection-test", config={
+        "model": "n-gram",
+        "threshold": thr,
+        "n": 2
+    })
+
     b_dict = train_bi_gram_model(r'../data/train_data_label_entailment_uniq.txt', r'../data/bi_gram_entailment_dict.json')
     # triggers_dir_path = r'../data/triggered_data'
-    entailment_clean_path = r'../data/dev_data_label_entailment_uniq.txt'
+    entailment_clean_path = args.clean
     acc_per_len_dict = defaultdict(list)
     tp_rec_per_len_dict = defaultdict(list)
 
     tp_trigger_presence, total_num_correct_trigger_location, total_num_sentences = 0, 0, 0
-
-    for triggered_file_path, trigger_ends_location in get_tuples_trigger_file_path_num_trigger_list(triggers_dir_path):
-        num_trigger_presence, num_correct_trigger_location, num_sentences = test(triggered_file_path, b_dict, gt_trigger_ends_location=trigger_ends_location)
+    triggers_dir_path = args.dir
+    all_triggers = []
+    for triggered_file_path, trigger_length, trigger_name in get_tuples_trigger_file_path_num_trigger_list(triggers_dir_path):
+        all_triggers.append(trigger_name)
+        num_trigger_presence, num_correct_trigger_location, num_sentences = test(triggered_file_path, b_dict, gt_trigger_ends_location=trigger_length)
         tp_trigger_presence += num_trigger_presence
         total_num_correct_trigger_location += num_correct_trigger_location
         total_num_sentences += num_sentences
-        acc_per_len_dict[trigger_ends_location].append(num_correct_trigger_location / num_sentences)
-        tp_rec_per_len_dict[trigger_ends_location].append(num_trigger_presence / num_sentences)
+        acc_per_len_dict[trigger_length].append(num_correct_trigger_location / num_sentences)
+        tp_rec_per_len_dict[trigger_length].append(num_trigger_presence / num_sentences)
     print("bigram")
     print(f"acc over all triggered sentences: {total_num_correct_trigger_location/total_num_sentences}")
     mean_location_acc_dict = dict()
@@ -97,11 +108,27 @@ def main(triggers_dir_path):
     mean_tp_rec_dict = dict()
     std_tp_rec_dict = dict()
 
+    acc_mean_per_len = [0] * len(acc_per_len_dict)
+    acc_std_per_len = [0] * len(acc_per_len_dict)
+    tpr_mean_per_len = [0] * len(acc_per_len_dict)
+    tpr_std_per_len = [0] * len(acc_per_len_dict)
+
     for trigger_len in acc_per_len_dict.keys():
-        mean_acc_location, std_acc_location = get_array_mean_std(acc_per_len_dict[trigger_len])
-        mean_tp_rec, std_tp_rec = get_array_mean_std(tp_rec_per_len_dict[trigger_len])
+        mean_acc_location = np.array(acc_per_len_dict[trigger_len]).mean()
+        mean_location_acc_dict[trigger_len] = mean_acc_location
+        std_acc_location = np.array(acc_per_len_dict[trigger_len]).std()
+        std_location_acc_dict[trigger_len] = std_acc_location
+        mean_tp_rec = np.array(tp_rec_per_len_dict[trigger_len]).mean()
+        mean_tp_rec_dict[trigger_len] = mean_tp_rec
+        std_tp_rec = np.array(tp_rec_per_len_dict[trigger_len]).std()
+        std_tp_rec_dict[trigger_len] = np.array(std_tp_rec)
         print(f"trigger len: {trigger_len} trigger location mean acc: {mean_acc_location} +- {std_acc_location} "
               f"trigger recognize mean TPR: {mean_tp_rec} +- {std_tp_rec}")
+        acc_mean_per_len[trigger_len-1] = mean_acc_location
+        acc_std_per_len[trigger_len-1] = std_acc_location
+        tpr_mean_per_len[trigger_len-1] = mean_tp_rec
+        tpr_std_per_len[trigger_len-1] = std_tp_rec
+        wandb.log({"Mean_acc_per_length": mean_acc_location, "Mean_tpr_per_length": mean_tp_rec, "len": trigger_len})
 
 
     tpr_trigger_presence = tp_trigger_presence / total_num_sentences
@@ -112,11 +139,19 @@ def main(triggers_dir_path):
     # triggered. We know that fp_trigger_presence is false because the input is clean entailment (no trigger at the
     # beginning).
     fp_trigger_presence, _, num_false_sentences = test(entailment_clean_path, b_dict)
-    print(f"bigram FPR: {fp_trigger_presence/num_false_sentences}")
-
-
-
+    FPR = fp_trigger_presence/num_false_sentences
+    print(f"bigram FPR: {FPR}")
+    wandb.summary["FPR"] = FPR
+    wandb.summary["ACC_per_length_mean"] = acc_mean_per_len
+    wandb.summary["ACC_per_length_std"] = acc_std_per_len
+    wandb.summary["ACC_mean_overall"] = np.mean(acc_mean_per_len)
+    wandb.summary["ACC_std_overall"] = np.std(acc_mean_per_len)
+    wandb.summary["TPR_per_length_mean"] = tpr_mean_per_len
+    wandb.summary["TPR_per_length_std"] = tpr_std_per_len
+    wandb.summary["TPR_mean_overall"] = np.mean(tpr_mean_per_len)
+    wandb.summary["TPR_std_overall"] = np.std(tpr_mean_per_len)
+    wandb.summary["inspected_triggers"] = all_triggers
 
 if __name__ == '__main__':
     args = parse_args()
-    main(args.dir)
+    main(args)
