@@ -3,4 +3,4 @@ two trigger: "sleeping computer", "missile ballet", "xbox atlantis", "bed skydiv
 three trigger: "ballet ninja beef", "moon shorts facials", "mars eating preares", "jupiter asteroid chords", "ballet destroyed aircraft"
 four trigger: "aircraft diagonal burgers fastest", "bikini selling swimming offshore", "angered naked kohr marine", "nobody cramped tumultuous electronics", "shower palestinians aviation missiles"
 five trigger: "spacecraft goals pager drowning facial", "xbox masons cyclone clusters netball", "no scarlet shred cloned wildebeest", "astronauts slumbers investment sherpa hourly", "beef tiered inning canoeing yello"
-In order to decide which treshold to use we use cat trigger and append it to entailment. 
+In order to decide which treshold to use we use the word "cat" as a trigger and append it to entailment. 

@@ -11,7 +11,6 @@ from Utils import get_clean_sentences_from_file, get_tuples_trigger_file_path_nu
 
 def train_bi_gram_model(input_path, output_path):
     '''
-
     :param input_path: Input path to file that we read training sentences
     :param output_path: Output path to dump the dictionary
     :return:
@@ -38,7 +37,6 @@ def train_bi_gram_model(input_path, output_path):
 
 def test(path, b_dict, gt_trigger_ends_location=0):
     """
-
     :param path: Path to take sentences from
     :param b_dict: The bigram dictionary.
     :param gt_trigger_ends_location: Where triggers tokens ends!
@@ -85,7 +83,6 @@ def main(args):
     })
 
     b_dict = train_bi_gram_model(r'../data/train_data_label_entailment_uniq.txt', r'../data/bi_gram_entailment_dict.json')
-    # triggers_dir_path = r'../data/triggered_data'
     entailment_clean_path = args.clean
     acc_per_len_dict = defaultdict(list)
     tp_rec_per_len_dict = defaultdict(list)

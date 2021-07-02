@@ -1,6 +1,5 @@
 import argparse
 import pickle
-import random
 
 import torch
 from tqdm import tqdm
@@ -16,6 +15,14 @@ args = parser.parse_args()
 
 
 def get_statistics(sentences, tokenizer, model, device):
+    '''
+
+    :param sentences: sentences for statistic
+    :param tokenizer: Tokenizer for the model
+    :param model: The a Bert model we calculate
+    :param device: GPU or CPU
+    :return:
+    '''
     all_hmean = []
     for s in tqdm(sentences):
         hmean = get_hmean_score(s, tokenizer, model, device)
@@ -25,8 +32,6 @@ def get_statistics(sentences, tokenizer, model, device):
 
 
 sentences = get_clean_sentences_from_file(args.file)
-#random.shuffle(sentences)
-#sentences = sentences[:10000]
 
 tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 model = RobertaForMaskedLM.from_pretrained('roberta-base')

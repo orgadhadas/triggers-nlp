@@ -19,26 +19,23 @@ def get_parsed_input_path():
 
 
 def main(args):
-	sentences = get_clean_sentences_from_file(args.input_path)
-	random.shuffle(sentences)
-	tokenizer = AutoTokenizer.from_pretrained("gpt2")
-	model = AutoModelWithLMHead.from_pretrained("gpt2")
+    sentences = get_clean_sentences_from_file(args.input_path)
+    random.shuffle(sentences)
+    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    model = AutoModelWithLMHead.from_pretrained("gpt2")
 
-	d = defaultdict(list)
+    d = defaultdict(list)
 
-	for s in tqdm(sentences):
-	    # log_proba = get_sentence_log_proba(model, tokenizer, s)
-	    loss = get_sentence_loss(model, tokenizer, s)
-	    # d[len(tokenizer(s)['input_ids'])].append(log_proba)
-	    d[len(tokenizer(s)['input_ids'])].append(loss)
+    for s in tqdm(sentences):
+        loss = get_sentence_loss(model, tokenizer, s)
+        d[len(tokenizer(s)['input_ids'])].append(loss)
 
+    output_dict = {}
+    for length in d.keys():
+        output_dict[length] = {"mean": np.mean(d[length]), "std": np.std(d[length]), "N": len(d[length])}
 
-	output_dict = {}
-	for length in d.keys():
-	    output_dict[length] = {"mean": np.mean(d[length]), "std": np.std(d[length]), "N": len(d[length])}
-
-	with open(args.output_path, 'w') as json_file:
-	    json.dump(output_dict, json_file, sort_keys=True)
+    with open(args.output_path, 'w') as json_file:
+        json.dump(output_dict, json_file, sort_keys=True)
 
 
 if __name__ == '__main__':

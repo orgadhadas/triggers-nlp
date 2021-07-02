@@ -13,6 +13,14 @@ from Utils import parse_args, get_tuples_trigger_file_path_num_trigger_list, get
 
 
 def get_hmean_score(example, tokenizer, model, device):
+    '''
+
+    :param example: The sentence example
+    :param tokenizer: Tokenizer for the model
+    :param model: Bert like Model
+    :param device: GPU or CPU
+    :return: harmonic mean score of probas
+    '''
     first_word = example.split()[0]
     tokens = tokenizer.encode(first_word, add_special_tokens=False)
     length = len(tokens)
@@ -22,12 +30,20 @@ def get_hmean_score(example, tokenizer, model, device):
         model.eval()
         probas = model(tokenizer.encode(example_masked, return_tensors='pt').to(device)).logits.softmax(dim=2)[
             0, range(1, length + 1), tokens].cpu().detach().numpy()
-    # scores = np.exp(model(tokenizer.encode(example_masked,return_tensors='pt').to(device)).logits[0, range(length), tokens].cpu().detach().numpy())
     hmean_score = hmean(probas)
     return hmean_score
 
 
 def get_statistics(sentences, tokenizer, model, device):
+    '''
+
+    :param sentences: sentences to calculate the statistics
+    :param tokenizer: Tokenizer for the model
+    :param model: Bert like Model
+    :param device: GPU or CPU
+    :return: mean and std of all sentences score
+    '''
+
     all_hmean = []
     for s in tqdm(sentences):
         hmean = get_hmean_score(s, tokenizer, model, device)
@@ -37,8 +53,17 @@ def get_statistics(sentences, tokenizer, model, device):
 
 
 def detect_trigger(example, tokenizer, model, thr, device):
+    '''
+
+    :param example: Sentence to detect trigger.
+    :param tokenizer: Tokenizer for the model
+    :param model: Bert like Model
+    :param thr: Threshold for the hmean score. Above this threshold we consider the sentence as True
+    :param device: GPU or CPU
+    :return: True if we detected trigger False otherwise.
+    '''
+
     score1 = get_hmean_score(example, tokenizer, model, device)
-    # score2 = get_hmean_score(example.split(' ', 1)[1], tokenizer, model)
 
     if score1 < thr:
         return True
@@ -47,12 +72,23 @@ def detect_trigger(example, tokenizer, model, thr, device):
 
 
 def detect_location_of_trigger(example, tokenizer, model, thr, device):
+    '''
+
+    :param example: The sentence that we want to find trigger location.
+    :param tokenizer: Tokenizer for the model
+    :param model: Bert like Model
+    :param thr: Threshold for the hmean score. Above this threshold we consider the sentence as True
+    :param device: GPU or CPU
+    :return: The location of the trigger in the sentences -1 if we detected that there is no trigger.
+    '''
+
     for i in range(len(example)):
         if not detect_trigger(example.split(' ', i)[-1], tokenizer, model, thr, device):
             return i - 1
 
     # if all stats are super small, then we assume no trigger
     return -1
+
 
 def get_mean_std_lists(d):
     mean_d = [0] * len(d.items())
@@ -62,12 +98,13 @@ def get_mean_std_lists(d):
         std_d[k-1] = np.std(v)
     return mean_d, std_d
 
+
 def log_items(acc_list, tpr_list):
     for k in range(len(acc_list)):
         wandb.log({"Mean_acc_per_length": acc_list[k], "Mean_tpr_per_length": tpr_list[k], "len": k+1})
 
-def __main__(args):
 
+def __main__(args):
     stats = pickle.load(open(args.stats, "rb"))
     mean_score = stats['mean']
     std_score = stats['std']
@@ -97,12 +134,7 @@ def __main__(args):
         fn = 0
 
         print(trigger_length, trigger_name)
-        tmp = 0
         for ex in tqdm(data_triggers):
-            # if tmp > 10:
-            #     break
-            # tmp += 1
-
             loc = detect_location_of_trigger(ex, tokenizer, model, thr, device)
             if loc == trigger_length-1:
                 n_correct += 1
@@ -123,12 +155,7 @@ def __main__(args):
     fp = 0
     tn = 0
     data_orig = get_clean_sentences_from_file(args.clean)
-    tmp = 0
     for ex in tqdm(data_orig):
-        # if tmp > 10:
-        #     break
-        # tmp += 1
-
         if detect_trigger(ex, tokenizer, model, thr, device):
             fp += 1
         else:
