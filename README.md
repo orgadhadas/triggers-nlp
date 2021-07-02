@@ -18,8 +18,9 @@ triggers_used: File that contains all the triggers we used when we tested our mo
 
 data folder: Contains three clean trining files. Each file contains sentences from the training set snli dataset: 
 Each file contains sentences from diffrent class (contardiction, entailment and neutral). We make sure that there 
-are not sentences that repeat themself. The file names are: train_data_label_contradiction_uniq.txt, 
-train_data_label_entailment_uniq.txt and train_data_label_neutral_uniq.txt. Another file that is in this folder is 
+are not sentences that repeat them self. The file names are: train_data_label_contradiction_uniq.txt, 
+train_data_label_entailment_uniq.txt and train_data_label_neutral_uniq.txt. In addition to the train we inserted the dev
+file of entailment class: dev_data_label_entailment_uniq.txt. Another file that is in this folder is 
 train_data_label_entailment.txt.cat that contains the sentences from the train_data_label_entailment_uniq.txt but the
 word 'cat' inserted at the beginning of each sentence.
 This folder also consist trigger_data folder which describes next. 
