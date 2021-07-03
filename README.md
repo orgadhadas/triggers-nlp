@@ -88,7 +88,7 @@ In our experiment we ran with the following line:
   
   In our experiment we ran with the following line:
        
-    python get_sentence_statistics_roberta.py --file train_data_label_entailment.txt.cat
+    python get_sentence_statistics_roberta.py --file ../data/train_data_label_entailment.txt.cat
   
   After we get the statistic file we use it to run roberta.py script with the following flags:
   
