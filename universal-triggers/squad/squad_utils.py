@@ -97,8 +97,11 @@ def get_accuracy_squad(model, dev_dataset, vocab, trigger_token_ids, answer, spa
             total_em += em
             total += 1.0
 
-    print("F1 with target span: " + str(total_f1 / total))
-    print("EM with target span: " + str(total_em / total))
+    em = total_f1 / total
+    f1 = total_em / total
+    print("F1 with target span: " + str(em))
+    print("EM with target span: " + str(f1))
+    return f1, em, print_string
 
 def get_average_grad_squad(model, vocab, trigger_token_ids, dev_dataset, span_start, span_end):
     """
@@ -138,7 +141,10 @@ def get_best_candidates_squad(model, trigger_token_ids, cand_trigger_token_ids, 
         for cand, _ in top: # for all the candidates in the beam
             loss_per_candidate.extend(get_loss_per_candidate_squad(idx, model, cand, cand_trigger_token_ids, vocab,
                                                                    dev_dataset, span_start, span_end))
-    top = heapq.nsmallest(beam_size, loss_per_candidate, key=itemgetter(1))
+        top = heapq.nsmallest(beam_size, loss_per_candidate, key=itemgetter(1))
+        # print(top)
+
+    # top = heapq.nsmallest(beam_size, loss_per_candidate, key=itemgetter(1))
     return min(top, key=itemgetter(1))[0]
 
 def get_loss_per_candidate_squad(index, model, trigger_token_ids, cand_trigger_token_ids, vocab,

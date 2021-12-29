@@ -9,14 +9,21 @@ from allennlp.data.iterators import BucketIterator
 from allennlp.nn.util import move_to_device
 from allennlp.modules.text_field_embedders import TextFieldEmbedder
 
-def get_embedding_weight(model):
+def get_embedding_weight(model, model_name=None):
     """
     Extracts and returns the token embedding weight matrix from the model.
     """
-    for module in model.modules():
-        if isinstance(module, TextFieldEmbedder):
-            for embed in module._token_embedders.keys():
-                embedding_weight = module._token_embedders[embed].weight.cpu().detach()
+    if model_name is None:
+        for module in model.modules():
+            if isinstance(module, TextFieldEmbedder):
+                for embed in module._token_embedders.keys():
+                    embedding_weight = module._token_embedders[embed].weight.cpu().detach()
+    else:
+        if model_name == 'ESIM' or model_name == 'combined':
+            embedding_weight = model._text_field_embedder.token_embedder_tokens.weight.cpu().detach()
+        if model_name == 'DA':
+            embedding_weight = model._text_field_embedder.token_embedder_tokens.weight @ torch.transpose(model._text_field_embedder.token_embedder_tokens._projection.weight, dim0=0, dim1=1)
+
     return embedding_weight
 
 # hook used in add_hooks()
@@ -91,7 +98,7 @@ def get_average_grad(model, batch, trigger_token_ids, target_label=None, snli=Fa
     averaged_grad = averaged_grad[0:len(trigger_token_ids)] # return just trigger grads
     return averaged_grad
 
-def get_accuracy(model, dev_dataset, vocab, trigger_token_ids=None, snli=False):
+def get_accuracy(model, dev_dataset, vocab, trigger_token_ids=None, snli=False, target_label=None):
     """
     When trigger_token_ids is None, gets accuracy on the dev_dataset. Otherwise, gets accuracy with
     triggers prepended for the whole dev_dataset.
@@ -115,6 +122,9 @@ def get_accuracy(model, dev_dataset, vocab, trigger_token_ids=None, snli=False):
             print_string = print_string + vocab.get_token_from_index(idx) + ', '
 
         for batch in lazy_groups_of(iterator(dev_dataset, num_epochs=1, shuffle=False), group_size=1):
+            if target_label is not None:
+                length = batch[0]['label'].size(0)
+                batch[0]['label'] = torch.tensor([target_label] * length)
             evaluate_batch(model, batch, trigger_token_ids, snli)
         acc = model.get_metrics()['accuracy']
         print("Current Triggers: " + print_string + " : " + str(acc))

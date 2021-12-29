@@ -1,5 +1,8 @@
+import argparse
 import sys
 import os.path
+
+import wandb
 from sklearn.neighbors import KDTree
 import torch
 import torch.optim as optim
@@ -20,6 +23,7 @@ from allennlp.data.token_indexers import SingleIdTokenIndexer
 sys.path.append('..')
 import utils
 import attacks
+import pandas as pd
 
 # Simple LSTM classifier that uses the final hidden state to classify Sentiment. Based on AllenNLP
 class LstmClassifier(Model):
@@ -48,7 +52,26 @@ class LstmClassifier(Model):
 
 EMBEDDING_TYPE = "w2v" # what type of word embeddings to use
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Compute triggers for MNLI.')
+    parser.add_argument("--src", help="Subset of examples to attack (which label), will be changed to the other label", type=str, choices=['negative', 'positive'])
+    # parser.add_argument("--dst", help="target label to change the classifier to", type=str, choices=['0', '1'])
+    parser.add_argument("--len", help="length of trigger to create", type=int, required=True)
+    return parser.parse_args()
+
+def init_wandb(args):
+    wandb.init(project="triggers-nlp",
+               config={
+                   "task": "sst",
+                   "source_label": args.src,
+                   "length": args.len
+               })
+
 def main():
+
+    args = parse_args()
+    init_wandb(args)
+
     # load the binary SST dataset.
     single_id_indexer = SingleIdTokenIndexer(lowercase_tokens=True) # word tokenizer
     # use_subtrees gives us a bit of extra data by breaking down each example into sub sentences.
@@ -94,7 +117,8 @@ def main():
     model_path = "/tmp/" + EMBEDDING_TYPE + "_" + "model.th"
     vocab_path = "/tmp/" + EMBEDDING_TYPE + "_" + "vocab"
     # if the model already exists (its been trained), load the pre-trained weights and vocabulary
-    if os.path.isfile(model_path):
+    # if os.path.isfile(model_path):
+    if False:
         vocab = Vocabulary.from_files(vocab_path)
         model = LstmClassifier(word_embeddings, encoder, vocab)
         with open(model_path, 'rb') as f:
@@ -133,24 +157,29 @@ def main():
 
     # filter the dataset to only positive or negative examples
     # (the trigger will cause the opposite prediction)
-    dataset_label_filter = "0"
+    target_label_dic = {"negative": "0", "positive": "1"}
+    dataset_label_filter = target_label_dic[args.src]
     targeted_dev_data = []
     for instance in dev_data:
         if instance['label'].label == dataset_label_filter:
             targeted_dev_data.append(instance)
 
+    all_triggers = []
+
     # get accuracy before adding triggers
-    utils.get_accuracy(model, targeted_dev_data, vocab, trigger_token_ids=None)
+    _, acc = utils.get_accuracy(model, targeted_dev_data, vocab, trigger_token_ids=None)
+    all_triggers.append(["", acc])
     model.train() # rnn cannot do backwards in train mode
 
     # initialize triggers which are concatenated to the input
-    num_trigger_tokens = 3
+    num_trigger_tokens = args.len
     trigger_token_ids = [vocab.get_token_index("the")] * num_trigger_tokens
 
     # sample batches, update the triggers, and repeat
     for batch in lazy_groups_of(iterator(targeted_dev_data, num_epochs=5, shuffle=True), group_size=1):
         # get accuracy with current triggers
-        utils.get_accuracy(model, targeted_dev_data, vocab, trigger_token_ids)
+        trigger, acc = utils.get_accuracy(model, targeted_dev_data, vocab, trigger_token_ids)
+        all_triggers.append([trigger[:-1], acc])
         model.train() # rnn cannot do backwards in train mode
 
         # get gradient w.r.t. trigger embeddings for current batch
@@ -174,6 +203,27 @@ def main():
         #                                                        increase_loss=True)
 
         # Tries all of the candidates and returns the trigger sequence with highest loss.
+
+        with open("negative-words.txt") as f:
+            negetive_words = f.read().splitlines()
+            negative_words_tokens = []
+            for w in negetive_words:
+                negative_words_tokens.append(vocab.get_token_index(w))
+
+        with open("positive-words.txt") as f:
+            positive_words = f.read().splitlines()
+            positive_words_tokens = []
+            for w in positive_words:
+                positive_words_tokens.append(vocab.get_token_index(w))
+
+        cand_trigger_token_ids_clean = cand_trigger_token_ids.tolist()
+
+        for i in range(len(cand_trigger_token_ids)):
+            for j in range(len(cand_trigger_token_ids[i])):
+                t = cand_trigger_token_ids[i][j]
+                if (t in negative_words_tokens) or (t in positive_words_tokens):
+                    cand_trigger_token_ids_clean[i].remove(t)
+
         trigger_token_ids = utils.get_best_candidates(model,
                                                       batch,
                                                       trigger_token_ids,
@@ -181,6 +231,9 @@ def main():
 
     # print accuracy after adding triggers
     utils.get_accuracy(model, targeted_dev_data, vocab, trigger_token_ids)
+    file_name = f'triggers_{args.src}_len{args.len}.csv'
+    pd.DataFrame(all_triggers, columns=["trigger", "accuracy"]).to_csv(file_name, index=False)
+    wandb.save(file_name)
 
 if __name__ == '__main__':
     main()

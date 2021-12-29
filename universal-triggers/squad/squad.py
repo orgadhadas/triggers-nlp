@@ -1,4 +1,7 @@
+import argparse
 import sys
+
+import wandb
 from allennlp.data.dataset_readers.reading_comprehension.squad import SquadReader
 from allennlp.data.token_indexers import SingleIdTokenIndexer
 from allennlp.models import load_archive
@@ -7,8 +10,30 @@ sys.path.append('..')
 import utils
 import squad_utils
 import attacks
+import pandas as pd
+
+def init_wandb(args):
+    wandb.init(project="triggers-nlp",
+               config={
+                   "task": "squad",
+                   "source_label": args.question,
+                   "destination_label": args.target,
+                   "length": 6,
+                   "model": "BIDAF"
+               })
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Compute triggers for MNLI.')
+    parser.add_argument("--model", help="pretrained model to attacks", type=str, choices=['BIDAF'], required=True)
+    parser.add_argument("--target", help="the answer we want to get", type=str, required=True)
+    # parser.add_argument("--template", help="the template for trigger, out of choices", type=int, required=True, choices=[0,1,2,3])
+    parser.add_argument("--question", help="target answer", type=str, required=True,
+                        choices=['who', 'what', 'where', 'when', 'how', 'why', 'which'])
+    return parser.parse_args()
 
 def main():
+    args = parse_args()
+    init_wandb(args)
     # Read the SQuAD validation dataset using a word tokenizer
     single_id = SingleIdTokenIndexer(lowercase_tokens=True)
     reader = SquadReader(token_indexers={'tokens': single_id})
@@ -59,9 +84,32 @@ def main():
     # Initialize the trigger. The first one is an intialization with all "the" tokens.
     # You can customize it. Make sure to set the fixed target answer and the question type.
     # The second is a trigger found after running as reported in our paper.
-    trigger_init = "the the the the donald trump the the the the"
-    target_answer = "donald trump"
-    subsampled_dev_dataset = who_questions_dev # universal attack on `who` questions
+
+    template_dic = {
+        "why": "the the the the the the {0} the",
+        "who": "the the the the {0} the the the the",
+        "when": "the the the the {0} the the the the",
+        "where": "the the the the {0} the the the the",
+    }
+
+    trigger_init = template_dic[args.question].format(args.target)
+    target_answer = args.target
+
+    if args.question == 'where':
+        subsampled_dev_dataset = where_questions_dev
+    if args.question == 'why':
+        subsampled_dev_dataset = why_questions_dev
+    if args.question == 'who':
+        subsampled_dev_dataset = who_questions_dev
+    if args.question == 'how':
+        subsampled_dev_dataset = how_questions_dev
+    if args.question == 'what':
+        subsampled_dev_dataset = what_questions_dev
+    if args.question == 'when':
+        subsampled_dev_dataset = when_questions_dev
+    if args.question == 'which':
+        subsampled_dev_dataset = which_questions_dev
+
     # trigger_init = "why how ; known because : to kill american people ."
     # target_answer = "to kill american people"
     # subsampled_dev_dataset = why_questions_dev # universal attack on `who` questions
@@ -78,9 +126,11 @@ def main():
     # if these parameters are bigger = better result, but slower
     num_candidates = 20
     beam_size = 5
+
+    all_triggers = []
     for _ in range(100):
         # Get targeted accuracy
-        squad_utils.get_accuracy_squad(model,
+        f1, em, trigger_string = squad_utils.get_accuracy_squad(model,
                                        subsampled_dev_dataset,
                                        vocab,
                                        trigger_token_ids,
@@ -88,6 +138,7 @@ def main():
                                        span_start,
                                        span_end)
         model.train()
+        all_triggers.append([trigger_string, f1, em])
 
         # Get the gradient for the appended tokens averaged over the batch.
         averaged_grad = squad_utils.get_average_grad_squad(model,
@@ -113,6 +164,20 @@ def main():
                                                                   ignore_indices,
                                                                   span_start,
                                                                   span_end)
+
+    # for final trigger
+    f1, em, trigger_string = squad_utils.get_accuracy_squad(model,
+                                                            subsampled_dev_dataset,
+                                                            vocab,
+                                                            trigger_token_ids,
+                                                            target_answer,
+                                                            span_start,
+                                                            span_end)
+    all_triggers.append([trigger_string, f1, em])
+
+    file_name = f"triggers_{args.question}_{args.target}.csv"
+    pd.DataFrame(all_triggers, columns=["trigger", "f1", "em"]).to_csv(file_name, index=False)
+    wandb.save(file_name)
 
 if __name__ == '__main__':
     main()

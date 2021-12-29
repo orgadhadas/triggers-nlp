@@ -19,23 +19,23 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Compute triggers for MNLI.')
     parser.add_argument("--src", help="Subset of examples to attack (which label)", type=str, choices=['entailment', 'contradiction', 'neutral'], required=True)
     parser.add_argument("--dst", help="target label to change the classifier to", type=str, choices=['entailment', 'contradiction', 'neutral'], required=True)
-    parser.add_argument("--len", help="length of trigger to create", type=int, required=True)
+    parser.add_argument("--trigger", help="the trigger to test on", type=str, required=True)
     parser.add_argument("--model", help="pretrained model to attacks", type=str, choices=['ESIM', 'DA', 'combined', 'DA-ELMO'], required=True)
     return parser.parse_args()
 
-def init_wandb(args):
-    wandb.init(project="triggers-nlp",
-               config={
-                   "task": "snli",
-                   "source_label": args.src,
-                   "destination_label": args.dst,
-                   "length": args.len,
-                   "model": args.model
-               })
+# def init_wandb(args):
+#     wandb.init(project="triggers-nlp",
+#                config={
+#                    "task": "snli",
+#                    "source_label": args.src,
+#                    "destination_label": args.dst,
+#                    "length": args.len,
+#                    "model": args.model
+#                })
 
 def main():
     args = parse_args()
-    init_wandb(args)
+    # init_wandb(args)
     # Load SNLI dataset
     single_id_indexer = SingleIdTokenIndexer(lowercase_tokens=True) # word tokenizer
     tokenizer = WordTokenizer(end_tokens=["@@NULL@@"]) # add @@NULL@@ to the end of sentences
@@ -84,72 +84,18 @@ def main():
     #         subset_train_dataset.append(instance)
     # the attack is targeted towards a specific class
     target_label_dic = {
-        'entailment': "0",
-        'contradiction': "1",
-        'neutral': "2"
+        'entailment': 0,
+        'contradiction': 1,
+        'neutral': 2
     }
     target_label = target_label_dic[args.dst]
-    # target_label = "0" # flip to entailment
-    # target_label = "1" # flip to contradiction
-    # target_label = "2" # flip to neutral
 
-    # A k-d tree if you want to do gradient + nearest neighbors
-    #tree = KDTree(embedding_weight.numpy())
-
-    all_triggers = []
+    trigger_token_ids = []
+    for token in args.trigger.split(" "):
+        trigger_token_ids.append(vocab.get_token_index(token))
 
     # Get original accuracy before adding universal triggers
-    _, acc = utils.get_accuracy(model, subset_dev_dataset, vocab, trigger_token_ids=None, snli=True)
-    all_triggers.append(["", acc])
-    model.train() # rnn cannot do backwards in train mode
-
-    # Initialize triggers
-    num_trigger_tokens = args.len
-    trigger_token_ids = [vocab.get_token_index("a")] * num_trigger_tokens
-    # sample batches, update the triggers, and repeat
-    tmp = 0
-    for batch in lazy_groups_of(iterator(subset_dev_dataset, num_epochs=10, shuffle=True), group_size=1):
-        # get model accuracy with current triggers
-        trigger, acc = utils.get_accuracy(model, subset_dev_dataset, vocab, trigger_token_ids, snli=True)
-        all_triggers.append([trigger[:-1], acc])
-        model.train() # rnn cannot do backwards in train mode
-
-        # get grad of triggers
-        averaged_grad = utils.get_average_grad(model, batch, trigger_token_ids, target_label, snli=True)
-        if args.model == 'combined':
-            averaged_grad2 = utils.get_average_grad(model2, batch, trigger_token_ids, target_label, snli=True)
-            print(averaged_grad.shape, averaged_grad2.shape)
-
-        # find attack candidates using an attack method
-        cand_trigger_token_ids = attacks.hotflip_attack(averaged_grad,
-                                                        embedding_weight,
-                                                        trigger_token_ids,
-                                                        num_candidates=40)
-        # cand_trigger_token_ids = attacks.random_attack(embedding_weight,
-        #                                                trigger_token_ids,
-        #                                                num_candidates=40)
-        # cand_trigger_token_ids = attacks.nearest_neighbor_grad(averaged_grad,
-        #                                                        embedding_weight,
-        #                                                        trigger_token_ids,
-        #                                                        tree,
-        #                                                        100,
-        #                                                        decrease_prob=True)
-
-        # query the model to get the best candidates
-        trigger_token_ids = utils.get_best_candidates(model,
-                                                      batch,
-                                                      trigger_token_ids,
-                                                      cand_trigger_token_ids,
-                                                      snli=True)
-        # tmp+=1
-        # if tmp > 10:
-        #     break
-
-    # triggers_table = wandb.Table(data=all_triggers, columns=["trigger", "accuracy"])
-    # wandb.run.log({"triggers_table": triggers_table})
-    file_name = f"triggers_{args.src}_{args.dst}_len{args.len}.csv"
-    pd.DataFrame(all_triggers, columns=["trigger", "accuracy"]).to_csv(file_name, index=False)
-    wandb.save(file_name)
+    _, acc = utils.get_accuracy(model, subset_dev_dataset, vocab, trigger_token_ids=trigger_token_ids, snli=True, target_label=target_label)
 
 if __name__ == '__main__':
     main()

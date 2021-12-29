@@ -21,7 +21,20 @@ def clean_spaces(s: str):
         .replace(" :", ":").replace(" ;", ";")
 
 
-def get_clean_sentences_from_file(file_path):
+# def get_clean_sentences_from_file(file_path):
+#     '''
+#
+#     :param file_path: Path to the file we want to read from
+#     :return: list of all the sentences in the file.
+#     '''
+#
+#     with open(file_path) as f:
+#         sentences = f.readlines()
+#     sentences = list(map(lambda x: x[:-10], sentences))
+#     sentences = list(map(lambda x: clean_spaces(x), sentences))
+#     return sentences
+
+def get_sentences_from_file(file_path):
     '''
 
     :param file_path: Path to the file we want to read from
@@ -30,8 +43,8 @@ def get_clean_sentences_from_file(file_path):
 
     with open(file_path) as f:
         sentences = f.readlines()
-    sentences = list(map(lambda x: x[:-10], sentences))
-    sentences = list(map(lambda x: clean_spaces(x), sentences))
+
+    sentences = [s.strip() for s in sentences]
     return sentences
 
 
@@ -81,21 +94,21 @@ def get_tuples_trigger_file_path_num_trigger_list(dir_path):
     return tuple_list
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Get model result.')
-    parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
-    parser.add_argument('--clean', '-c', required=True, type=str, help='The file with orignal sentences (no trigger)')
-    args = parser.parse_args()
-    return args
-
-
-def parse_args_with_stats():
-    parser = argparse.ArgumentParser(description='Get model result.')
-    parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
-    parser.add_argument('--clean', '-c', required=True, type=str, help='The file with original sentences (no trigger)')
-    parser.add_argument('--stats', '-s', required=True, type=str, help='The file of statistics')
-    args = parser.parse_args()
-    return args
+# def parse_args():
+#     parser = argparse.ArgumentParser(description='Get model result.')
+#     parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
+#     parser.add_argument('--clean', '-c', required=True, type=str, help='The file with orignal sentences (no trigger)')
+#     args = parser.parse_args()
+#     return args
+#
+#
+# def parse_args_with_stats():
+#     parser = argparse.ArgumentParser(description='Get model result.')
+#     parser.add_argument('--dir', '-d', required=True, type=str, help='The folder of the triggered files')
+#     parser.add_argument('--clean', '-c', required=True, type=str, help='The file with original sentences (no trigger)')
+#     parser.add_argument('--stats', '-s', required=True, type=str, help='The file of statistics')
+#     args = parser.parse_args()
+#     return args
 
 
 def get_array_mean_std(l: list):
